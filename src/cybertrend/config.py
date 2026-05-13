@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     tenable_secret_key: Optional[str] = None
     llm_provider: str = "disabled"
     llm_api_key: Optional[str] = None
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    email_from: str = ""
 
     ses_from_email: str = "security-alerts@example.com"
     ses_configuration_set: Optional[str] = None
