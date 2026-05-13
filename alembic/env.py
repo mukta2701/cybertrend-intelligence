@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import os
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from cybertrend.db import models  # noqa: F401
-from cybertrend.db.base import Base
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if SRC.exists():
+    sys.path.insert(0, str(SRC))
+
+from cybertrend.db import models  # noqa: E402,F401
+from cybertrend.db.base import Base  # noqa: E402
 
 config = context.config
 
