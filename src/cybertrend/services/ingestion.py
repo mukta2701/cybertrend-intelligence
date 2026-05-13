@@ -70,13 +70,27 @@ class IngestionService:
     def _enrich_item(self, item: TrendItem) -> Dict[str, CVEEnrichment]:
         results: Dict[str, CVEEnrichment] = {}
         for cve in item.cves:
+            cached = (
+                self.repository.get_enrichment(cve)
+                if getattr(self.repository, "get_enrichment", None)
+                else None
+            )
+            if cached:
+                results[cve] = cached
+                continue
             pieces = []
             for client in (self.nvd_client, self.epss_client, self.kev_client, self.tenable_client):
                 try:
                     pieces.append(client.fetch(cve))
                 except Exception:
                     continue
-            results[cve] = merge_enrichments(cve, pieces)
+            merged = merge_enrichments(cve, pieces)
+            results[cve] = merged
+            if getattr(self.repository, "upsert_enrichment", None):
+                try:
+                    self.repository.upsert_enrichment(merged)
+                except Exception:
+                    pass
         return results
 
     def _source_trust(self, item: TrendItem) -> float:

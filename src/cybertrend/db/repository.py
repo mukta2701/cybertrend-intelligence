@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from cybertrend.db.models import (
     AlertDeliveryRecord,
+    CVEEnrichmentRecord,
     DigestRunRecord,
     SourceHealthRecord,
     SourcePolicyRecord,
@@ -15,6 +16,7 @@ from cybertrend.db.models import (
 )
 from cybertrend.dedupe import dedupe_key
 from cybertrend.models import (
+    CVEEnrichment,
     DigestPayload,
     SourceHealth,
     SourcePolicy,
@@ -134,6 +136,57 @@ class Repository:
         if not record:
             return None
         return DigestPayload.model_validate(record.payload)
+
+    def get_enrichment(self, cve: str) -> Optional[CVEEnrichment]:
+        record = self.session.get(CVEEnrichmentRecord, cve)
+        if record is None:
+            return None
+        updated = record.updated_at
+        if updated.tzinfo is None:
+            updated = updated.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - updated > timedelta(hours=24):
+            return None
+        return CVEEnrichment(
+            cve=record.cve,
+            cvss_base=record.cvss_base,
+            cvss_severity=record.cvss_severity,
+            epss_probability=record.epss_probability,
+            epss_percentile=record.epss_percentile,
+            kev=record.kev,
+            tenable_vpr=record.tenable_vpr,
+            exploit_maturity=record.exploit_maturity,
+            vendor_project=record.vendor_project,
+            product=record.product,
+            vulnerability_name=record.vulnerability_name,
+            required_action=record.required_action,
+            references=list(record.references or []),
+            raw=dict(record.raw or {}),
+        )
+
+    def upsert_enrichment(self, enrichment: CVEEnrichment) -> None:
+        values = {
+            "cve": enrichment.cve,
+            "cvss_base": enrichment.cvss_base,
+            "cvss_severity": enrichment.cvss_severity,
+            "epss_probability": enrichment.epss_probability,
+            "epss_percentile": enrichment.epss_percentile,
+            "kev": enrichment.kev,
+            "tenable_vpr": enrichment.tenable_vpr,
+            "exploit_maturity": enrichment.exploit_maturity,
+            "vendor_project": enrichment.vendor_project,
+            "product": enrichment.product,
+            "vulnerability_name": enrichment.vulnerability_name,
+            "required_action": enrichment.required_action,
+            "references": enrichment.references,
+            "raw": enrichment.raw,
+        }
+        stmt = insert(CVEEnrichmentRecord).values(**values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[CVEEnrichmentRecord.cve],
+            set_={k: v for k, v in values.items() if k != "cve"},
+        )
+        self.session.execute(stmt)
+        self.session.commit()
 
     def get_source_health(self) -> List[SourceHealth]:
         records = list(
