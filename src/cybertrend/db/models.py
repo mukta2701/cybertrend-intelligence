@@ -64,6 +64,7 @@ class TrendItemRecord(Base, TimestampMixin):
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     severity_label: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     score_breakdown: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    llm_analysis: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=None)
     raw: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 

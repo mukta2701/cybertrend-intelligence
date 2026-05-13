@@ -23,9 +23,9 @@ def test_manual_run_processes_all_jobs_synchronously_without_queue():
 
     result = pipeline.trigger_manual_run()
 
-    assert result["queued_jobs"] == 7
-    assert result["processed_jobs"] == 7
-    assert result["stored_items"] == 14
+    assert result["queued_jobs"] == 8
+    assert result["processed_jobs"] == 8
+    assert result["stored_items"] == 16
     assert len(result["failed_jobs"]) == 0
     source_types = {job["source_type"] for job in ingestion.jobs}
     assert source_types == {"rss", "nvd"}

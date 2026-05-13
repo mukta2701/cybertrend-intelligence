@@ -7,3 +7,7 @@ ignore:
     reason: "_sanitize() redacts PII from article text before prompt construction"
   - fingerprint: "b4394e8bf249b839"
     reason: "_sanitize() redacts PII from article text before prompt construction"
+  - fingerprint: "b4e97a3d8b8b46b2"
+    reason: "test mock of OpenAI client — no real data sent to LLM"
+  - fingerprint: "0958ac552e44e023"
+    reason: "test mock of OpenAI client — no real data sent to LLM"

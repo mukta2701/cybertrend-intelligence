@@ -11,8 +11,8 @@ def _item():
     return TrendItem(
         item_id="item-1",
         source_type=SourceType.RSS,
-        source_name="reddit_netsec",
-        title="CVE-2026-12345 remote code execution exploited",
+        source_name="thehackernews",
+        title="Cisco ASA Auth Bypass Exploited in the Wild",
         url="https://example.com",
         published_at=datetime(2026, 5, 13, 7, 30, tzinfo=timezone.utc),
         cves=["CVE-2026-12345"],
@@ -23,13 +23,18 @@ def _item():
     )
 
 
-def test_openai_summarizer_enriches_summary_fields():
+def test_openai_summarizer_populates_llm_analysis():
     mock_response = MagicMock()
-    mock_response.choices[0].message.content = (
-        '{"summary": "Critical RCE bug actively exploited.", '
-        '"what_went_wrong": "Unauthenticated remote code execution in edge devices.", '
-        '"why_this_matters_now": "CISA KEV confirms in-the-wild exploitation."}'
-    )
+    mock_response.choices[0].message.content = """{
+        "headline": "Cisco ASA — Auth bypass enables unauthenticated remote access",
+        "affected_assets": "Cisco ASA and FTD appliances running firmware < 9.18.4",
+        "vulnerability": "CVE-2026-12345 is an authentication bypass in the Cisco ASA VPN component that allows unauthenticated access to protected management functions.",
+        "threat": "An unauthenticated remote attacker can reach protected administrative functions and potentially execute commands or take over the device.",
+        "exploitation_status": "Actively exploited — CISA KEV listed and observed in ransomware campaigns.",
+        "organizational_risk": "Unpatched internet-facing firewalls can give attackers initial network access, enabling lateral movement and ransomware deployment.",
+        "recommended_action": "Patch to version 9.18.4 or later immediately; restrict management interface exposure to trusted IPs.",
+        "why_it_matters": "Edge firewall compromise provides attackers a persistent foothold with full network visibility."
+    }"""
 
     with patch("cybertrend.summaries_openai.OpenAI") as mock_openai_class:
         mock_client = MagicMock()
@@ -39,9 +44,16 @@ def test_openai_summarizer_enriches_summary_fields():
         provider = OpenAISummaryProvider(api_key=OPENAI_KEY_PLACEHOLDER)
         result = provider.summarize(_item(), enrichments={})
 
-    assert result.summary == "Critical RCE bug actively exploited."
-    assert "unauthenticated" in result.what_went_wrong.lower()
-    assert "KEV" in result.why_this_matters_now
+    assert result.llm_analysis is not None
+    assert "Cisco" in result.llm_analysis["headline"]
+    assert "CVE-2026-12345" in result.llm_analysis["vulnerability"]
+    assert "unauthenticated" in result.llm_analysis["threat"].lower()
+    assert "ransomware" in result.llm_analysis["organizational_risk"].lower()
+    assert result.llm_analysis["recommended_action"] != ""
+    assert result.llm_analysis["why_it_matters"] != ""
+    # Legacy fields also populated
+    assert result.summary == result.llm_analysis["vulnerability"]
+    assert result.what_went_wrong == result.llm_analysis["threat"]
 
 
 def test_openai_summarizer_falls_back_when_response_is_empty():
@@ -57,5 +69,5 @@ def test_openai_summarizer_falls_back_when_response_is_empty():
         item = _item()
         result = provider.summarize(item, enrichments={})
 
-    assert result.summary == item.summary
+    assert result.llm_analysis is None
     assert result.item_id == item.item_id

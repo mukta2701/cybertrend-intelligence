@@ -58,12 +58,12 @@ class HybridSummaryProvider:
 
     def summarize(self, item: TrendItem, enrichments: Mapping[str, CVEEnrichment]) -> TrendItem:
         grounded = self.rules.summarize(item, enrichments)
-        if not self.llm_provider or not item.cves:
+        if not self.llm_provider:
             return grounded
         try:
-            candidate = self.llm_provider.summarize(grounded, enrichments)
+            candidate = self.llm_provider.summarize(item, enrichments)
         except Exception:
             return grounded
-        if not candidate.summary or not candidate.what_went_wrong:
+        if not candidate.summary:
             return grounded
         return candidate

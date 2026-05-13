@@ -108,10 +108,10 @@ class IngestionService:
         return results
 
     def _source_trust(self, item: TrendItem) -> float:
-        if item.source_name in {"reddit_netsec", "reddit_blueteamsec"}:
-            return 0.85
         if item.source_name in {"tenable", "nvd", "kev"}:
             return 0.95
+        if item.source_name in {"krebsonsecurity", "sans_isc", "darkreading"}:
+            return 0.85
         return 0.70
 
     def _corroboration_count(self, item: TrendItem) -> int:

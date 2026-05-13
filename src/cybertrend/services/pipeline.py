@@ -19,11 +19,12 @@ from cybertrend.services.ingestion import IngestionService
 from cybertrend.summaries import HybridSummaryProvider
 
 DEFAULT_RSS_FEEDS = {
-    "reddit_netsec": "https://www.reddit.com/r/netsec/.rss",
-    "reddit_cybersecurity": "https://www.reddit.com/r/cybersecurity/.rss",
-    "reddit_threatintel": "https://www.reddit.com/r/threatintel/.rss",
-    "reddit_blueteamsec": "https://www.reddit.com/r/blueteamsec/.rss",
-    "reddit_malware": "https://www.reddit.com/r/Malware/.rss",
+    "bleepingcomputer": "https://www.bleepingcomputer.com/feed/",
+    "thehackernews": "https://feeds.feedburner.com/TheHackersNews",
+    "krebsonsecurity": "https://krebsonsecurity.com/feed/",
+    "sans_isc": "https://isc.sans.edu/rssfeed_full.xml",
+    "darkreading": "https://www.darkreading.com/rss.xml",
+    "securityweek": "https://www.securityweek.com/feed/",
     "tenable": "https://www.tenable.com/security/research/feed",
 }
 
@@ -170,9 +171,9 @@ class PipelineService:
         return DigestPayload(
             digest_date=digest_date,
             sections=[
-                DigestSection(name="Critical - Act Now", severity="Critical", items=[]),
-                DigestSection(name="High - Prioritize This Week", severity="High", items=[]),
-                DigestSection(name="Medium - Track", severity="Medium", items=[]),
+                DigestSection(name="Critical Threats", severity="Critical", items=[]),
+                DigestSection(name="High Priority", severity="High", items=[]),
+                DigestSection(name="Medium Risk", severity="Medium", items=[]),
             ],
         )
 

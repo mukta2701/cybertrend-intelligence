@@ -85,6 +85,7 @@ class TrendItem(BaseModel):
     confidence_score: float = 0
     severity_label: str = SeverityLabel.LOW.value
     score_breakdown: ScoreBreakdown = Field(default_factory=ScoreBreakdown)
+    llm_analysis: Optional[Dict[str, Any]] = None
     raw: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("cves")

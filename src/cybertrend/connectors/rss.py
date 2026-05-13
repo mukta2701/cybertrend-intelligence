@@ -41,7 +41,11 @@ class RSSConnector:
     def __init__(self, source_name: str, url: str, http: Optional[httpx.Client] = None):
         self.source_name = source_name
         self.url = url
-        self.http = http or httpx.Client(timeout=20)
+        self.http = http or httpx.Client(
+            timeout=20,
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; CyberTrendBot/1.0)"},
+        )
 
     def fetch(self) -> List[TrendItem]:
         response = self.http.get(self.url)
