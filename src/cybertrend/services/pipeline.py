@@ -144,9 +144,11 @@ class PipelineService:
 
     def get_digest(self, digest_date: date) -> DigestPayload:
         if self.repository:
-            payload = self.repository.get_digest(digest_date)
-            if payload:
-                return payload
+            stored = self.repository.get_digest(digest_date)
+            if stored:
+                return stored
+            if getattr(self.repository, "build_digest_from_items", None):
+                return self.repository.build_digest_from_items(digest_date)
         return DigestPayload(
             digest_date=digest_date,
             sections=[

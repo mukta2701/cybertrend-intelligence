@@ -18,6 +18,7 @@ from cybertrend.dedupe import dedupe_key
 from cybertrend.models import (
     CVEEnrichment,
     DigestPayload,
+    DigestSection,
     SourceHealth,
     SourcePolicy,
     SourceType,
@@ -136,6 +137,41 @@ class Repository:
         if not record:
             return None
         return DigestPayload.model_validate(record.payload)
+
+    def build_digest_from_items(self, digest_date: date) -> DigestPayload:
+        start = datetime(
+            digest_date.year, digest_date.month, digest_date.day, tzinfo=timezone.utc
+        )
+        end = start + timedelta(days=1)
+        records = list(
+            self.session.scalars(
+                select(TrendItemRecord)
+                .where(TrendItemRecord.published_at >= start)
+                .where(TrendItemRecord.published_at < end)
+                .order_by(TrendItemRecord.criticality_score.desc())
+            )
+        )
+        buckets: Dict[str, List[TrendItem]] = {"Critical": [], "High": [], "Medium": []}
+        for record in records:
+            item = _record_to_item(record)
+            if item.severity_label in buckets:
+                buckets[item.severity_label].append(item)
+        return DigestPayload(
+            digest_date=digest_date,
+            sections=[
+                DigestSection(
+                    name="Critical - Act Now",
+                    severity="Critical",
+                    items=buckets["Critical"],
+                ),
+                DigestSection(
+                    name="High - Prioritize This Week",
+                    severity="High",
+                    items=buckets["High"],
+                ),
+                DigestSection(name="Medium - Track", severity="Medium", items=buckets["Medium"]),
+            ],
+        )
 
     def get_enrichment(self, cve: str) -> Optional[CVEEnrichment]:
         record = self.session.get(CVEEnrichmentRecord, cve)
