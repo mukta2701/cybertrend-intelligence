@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cybertrend
+          POSTGRES_PASSWORD: cybertrend
+          POSTGRES_DB: cybertrend
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cybertrend -d cybertrend"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/pip install -e ".[dev,infra]"
+      - name: Lint
+        run: .venv/bin/ruff check .
+      - name: Type check
+        run: .venv/bin/pyright
+      - name: Migrate
+        env:
+          DATABASE_URL: postgresql+psycopg://cybertrend:cybertrend@localhost:5432/cybertrend
+        run: .venv/bin/alembic upgrade head
+      - name: Test
+        run: .venv/bin/pytest --cov=cybertrend --cov-report=term-missing
+      - name: CDK synth
+        run: npx aws-cdk synth

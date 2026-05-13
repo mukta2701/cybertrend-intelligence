@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cybertrend
+      POSTGRES_PASSWORD: cybertrend
+      POSTGRES_DB: cybertrend
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cybertrend -d cybertrend"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - cybertrend-postgres:/var/lib/postgresql/data
+
+volumes:
+  cybertrend-postgres:
+
