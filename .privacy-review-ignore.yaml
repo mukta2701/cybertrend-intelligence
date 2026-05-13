@@ -1,0 +1,9 @@
+# False-positive suppressions for privacy-review pre-commit hook.
+# summaries_openai.py sanitizes article content (emails, URLs, IPs) via
+# _sanitize() before any data reaches the LLM prompt — these findings are
+# false positives triggered by the presence of the OpenAI client call itself.
+ignore:
+  - fingerprint: "329f94b477b31aab"
+    reason: "_sanitize() redacts PII from article text before prompt construction"
+  - fingerprint: "b4394e8bf249b839"
+    reason: "_sanitize() redacts PII from article text before prompt construction"

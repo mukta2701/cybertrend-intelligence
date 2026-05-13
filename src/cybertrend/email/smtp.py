@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import smtplib
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Iterable
@@ -26,7 +27,8 @@ class SMTPEmailSender:
         msg["To"] = ", ".join(recipient_list)
         msg.attach(MIMEText(message.text, "plain"))
         msg.attach(MIMEText(message.html, "html"))
+        tls_context = ssl.create_default_context()
         with smtplib.SMTP(self.host, self.port) as smtp:
-            smtp.starttls()
+            smtp.starttls(context=tls_context)
             smtp.login(self.user, self.password)
             smtp.sendmail(self.from_email, recipient_list, msg.as_string())

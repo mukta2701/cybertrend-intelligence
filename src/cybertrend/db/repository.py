@@ -51,6 +51,7 @@ def _item_to_record(item: TrendItem) -> Dict[str, Any]:
         "confidence_score": item.confidence_score,
         "severity_label": item.severity_label,
         "score_breakdown": item.score_breakdown.model_dump(),
+        "llm_analysis": item.llm_analysis,
         "raw": item.raw,
     }
 
@@ -79,6 +80,7 @@ def _record_to_item(record: TrendItemRecord) -> TrendItem:
         "confidence_score": record.confidence_score,
         "severity_label": record.severity_label,
         "score_breakdown": record.score_breakdown,
+        "llm_analysis": record.llm_analysis if isinstance(record.llm_analysis, dict) else None,
         "raw": record.raw,
     }
     return TrendItem.model_validate(payload)
@@ -114,9 +116,12 @@ class Repository:
         if since:
             statement = statement.where(TrendItemRecord.published_at >= since)
         if cursor:
-            statement = statement.where(
-                TrendItemRecord.published_at < datetime.fromisoformat(cursor)
-            )
+            try:
+                statement = statement.where(
+                    TrendItemRecord.published_at < datetime.fromisoformat(cursor)
+                )
+            except ValueError:
+                pass  # invalid cursor ignored — return from beginning
         statement = statement.order_by(TrendItemRecord.published_at.desc()).limit(limit + 1)
         records = list(self.session.scalars(statement))
         next_cursor = None
@@ -138,6 +143,20 @@ class Repository:
             return None
         return DigestPayload.model_validate(record.payload)
 
+    def get_items_by_ingestion_date(self, ingestion_date: date) -> List[TrendItem]:
+        start = datetime(
+            ingestion_date.year, ingestion_date.month, ingestion_date.day, tzinfo=timezone.utc
+        )
+        end = start + timedelta(days=1)
+        records = list(
+            self.session.scalars(
+                select(TrendItemRecord)
+                .where(TrendItemRecord.created_at >= start)
+                .where(TrendItemRecord.created_at < end)
+            )
+        )
+        return [_record_to_item(r) for r in records]
+
     def build_digest_from_items(self, digest_date: date) -> DigestPayload:
         start = datetime(
             digest_date.year, digest_date.month, digest_date.day, tzinfo=timezone.utc
@@ -146,8 +165,8 @@ class Repository:
         records = list(
             self.session.scalars(
                 select(TrendItemRecord)
-                .where(TrendItemRecord.published_at >= start)
-                .where(TrendItemRecord.published_at < end)
+                .where(TrendItemRecord.created_at >= start)
+                .where(TrendItemRecord.created_at < end)
                 .order_by(TrendItemRecord.criticality_score.desc())
             )
         )
@@ -160,16 +179,16 @@ class Repository:
             digest_date=digest_date,
             sections=[
                 DigestSection(
-                    name="Critical - Act Now",
+                    name="Critical Threats",
                     severity="Critical",
                     items=buckets["Critical"],
                 ),
                 DigestSection(
-                    name="High - Prioritize This Week",
+                    name="High Priority",
                     severity="High",
                     items=buckets["High"],
                 ),
-                DigestSection(name="Medium - Track", severity="Medium", items=buckets["Medium"]),
+                DigestSection(name="Medium Risk", severity="Medium", items=buckets["Medium"]),
             ],
         )
 
