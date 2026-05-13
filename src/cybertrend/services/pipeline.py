@@ -27,6 +27,10 @@ DEFAULT_RSS_FEEDS = {
     "tenable": "https://www.tenable.com/security/research/feed",
 }
 
+DEFAULT_NVD_JOBS = [
+    {"source_type": "nvd", "source_name": "nvd", "hours_back": 24},
+]
+
 
 class PipelineService:
     def __init__(
@@ -105,6 +109,8 @@ class PipelineService:
                     "requested_at": requested_at,
                 }
             )
+        for nvd_job in DEFAULT_NVD_JOBS:
+            jobs.append({**nvd_job, "requested_at": requested_at})
         processed_jobs = 0
         stored_items = 0
         failed_jobs: List[Dict[str, Any]] = []

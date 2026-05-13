@@ -218,3 +218,47 @@ def test_nvd_client_parses_references_from_list():
 
     assert "https://example.com/advisory" in enrichment.references
     assert len(enrichment.references) == 2
+
+
+def test_nvd_client_fetches_recent_cves_as_trend_items():
+    def handler(request):
+        assert "pubStartDate" in str(request.url)
+        return httpx.Response(
+            200,
+            json={
+                "resultsPerPage": 1,
+                "totalResults": 1,
+                "vulnerabilities": [
+                    {
+                        "cve": {
+                            "id": "CVE-2026-99999",
+                            "published": "2026-05-13T08:00:00.000",
+                            "descriptions": [
+                                {
+                                    "lang": "en",
+                                    "value": (
+                                        "A critical buffer overflow in Example Corp firmware."
+                                    ),
+                                }
+                            ],
+                            "metrics": {
+                                "cvssMetricV31": [
+                                    {"cvssData": {"baseScore": 9.1, "baseSeverity": "CRITICAL"}}
+                                ]
+                            },
+                            "references": [{"url": "https://example.com/advisory"}],
+                        }
+                    }
+                ],
+            },
+        )
+
+    client = NVDClient(http=httpx.Client(transport=httpx.MockTransport(handler)))
+    items = client.fetch_recent(hours_back=24)
+
+    assert len(items) == 1
+    assert items[0].item_id == "nvd:CVE-2026-99999"
+    assert items[0].source_type.value == "nvd"
+    assert items[0].cves == ["CVE-2026-99999"]
+    assert items[0].cvss_base == 9.1
+    assert "buffer overflow" in items[0].summary.lower()

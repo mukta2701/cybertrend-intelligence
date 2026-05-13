@@ -48,6 +48,9 @@ class IngestionService:
             elif source_type == "rss":
                 rss_connector = RSSConnector(source_name=source_name, url=job["url"])
                 items = rss_connector.fetch()
+            elif source_type == "nvd":
+                hours_back = int(job.get("hours_back", 24))
+                items = self.nvd_client.fetch_recent(hours_back=hours_back)
             else:
                 raise ValueError(f"Unsupported source_type: {source_type}")
             count = self.process_items(items)
