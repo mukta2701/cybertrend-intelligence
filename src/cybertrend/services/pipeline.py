@@ -12,10 +12,11 @@ from cybertrend.connectors.tenable import TenableVPRClient
 from cybertrend.db.repository import Repository
 from cybertrend.db.session import make_session_factory
 from cybertrend.email.render import render_daily_digest, render_immediate_alert
-from cybertrend.email.ses import SESEmailSender
+from cybertrend.email.smtp import SMTPEmailSender
 from cybertrend.models import DigestPayload, DigestSection, SourcePolicy, TrendItem
 from cybertrend.queue import SQSQueue
 from cybertrend.services.ingestion import IngestionService
+from cybertrend.summaries import HybridSummaryProvider
 
 DEFAULT_RSS_FEEDS = {
     "reddit_netsec": "https://www.reddit.com/r/netsec/.rss",
@@ -58,11 +59,21 @@ class PipelineService:
             if os.environ.get("ALERT_QUEUE_URL")
             else None
         )
-        email_sender = SESEmailSender(
-            from_email=settings.ses_from_email,
-            configuration_set=settings.ses_configuration_set,
-            region_name=settings.aws_region,
-        )
+        email_sender = None
+        if settings.smtp_user and settings.smtp_password:
+            email_sender = SMTPEmailSender(
+                host=settings.smtp_host,
+                port=settings.smtp_port,
+                user=settings.smtp_user,
+                password=settings.smtp_password,
+                from_email=settings.email_from or settings.smtp_user,
+            )
+        llm_provider = None
+        if settings.llm_provider == "openai" and settings.llm_api_key:
+            from cybertrend.summaries_openai import OpenAISummaryProvider
+
+            llm_provider = OpenAISummaryProvider(api_key=settings.llm_api_key)
+        summarizer = HybridSummaryProvider(llm_provider=llm_provider)
         ingestion = IngestionService(
             repository=repository,
             alert_queue=alert_queue,
@@ -70,6 +81,7 @@ class PipelineService:
                 access_key=settings.tenable_access_key,
                 secret_key=settings.tenable_secret_key,
             ),
+            summarizer=summarizer,
         )
         return cls(
             repository=repository,

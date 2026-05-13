@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import Dict, Iterable, List, Optional
 
 from cybertrend.connectors.epss import EPSSClient
@@ -45,7 +46,8 @@ class IngestionService:
                     raise RuntimeError("Reddit client is not configured")
                 items = self.reddit_client.fetch_subreddit(job["community"])
             elif source_type == "rss":
-                items = RSSConnector(source_name=source_name, url=job["url"]).fetch()
+                rss_connector = RSSConnector(source_name=source_name, url=job["url"])
+                items = rss_connector.fetch()
             else:
                 raise ValueError(f"Unsupported source_type: {source_type}")
             count = self.process_items(items)
@@ -98,10 +100,8 @@ class IngestionService:
             merged = merge_enrichments(cve, pieces)
             results[cve] = merged
             if getattr(self.repository, "upsert_enrichment", None):
-                try:
+                with suppress(Exception):
                     self.repository.upsert_enrichment(merged)
-                except Exception:
-                    pass
         return results
 
     def _source_trust(self, item: TrendItem) -> float:
