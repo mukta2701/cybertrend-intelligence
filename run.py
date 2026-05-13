@@ -4,6 +4,12 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_ROOT = PROJECT_ROOT / "src"
+if SRC_ROOT.exists():
+    sys.path.insert(0, str(SRC_ROOT))
 
 
 def main() -> None:
@@ -16,6 +22,9 @@ def main() -> None:
         sys.exit(0)
 
     command = sys.argv[1]
+    if command not in {"collect", "digest", "api"}:
+        print(f"Unknown command: {command!r}")
+        sys.exit(1)
 
     from cybertrend.config import get_settings
     from cybertrend.services.pipeline import PipelineService
@@ -43,10 +52,6 @@ def main() -> None:
 
         app = create_app(pipeline=pipeline, api_key=settings.api_key)
         uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
-
-    else:
-        print(f"Unknown command: {command!r}")
-        sys.exit(1)
 
 
 if __name__ == "__main__":

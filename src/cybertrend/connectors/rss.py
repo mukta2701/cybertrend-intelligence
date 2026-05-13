@@ -15,7 +15,11 @@ from cybertrend.text import collapse_whitespace, extract_cves
 def _parse_date(value: str | None) -> datetime:
     if not value:
         return datetime.now(timezone.utc)
-    parsed = parsedate_to_datetime(value)
+    normalized = value.strip()
+    try:
+        parsed = parsedate_to_datetime(normalized)
+    except ValueError:
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)

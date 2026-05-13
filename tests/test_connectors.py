@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import httpx
 
 from cybertrend.connectors.epss import EPSSClient
@@ -163,6 +165,28 @@ def test_rss_connector_uses_path_safe_stable_item_ids():
     assert items[0].item_id.startswith("rss:tenable:")
     assert "/" not in items[0].item_id
     assert " " not in items[0].item_id
+
+
+def test_rss_connector_parses_iso8601_atom_dates():
+    feed = """<?xml version="1.0"?>
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry><title>CVE-2026-12345 advisory</title>
+      <id>tag:reddit.com,2026:/r/netsec/comments/abc/example</id>
+      <link href="https://example.com/a" />
+      <summary>Patch now</summary>
+      <updated>2026-01-26T01:29:14+00:00</updated></entry>
+    </feed>"""
+    connector = RSSConnector(
+        source_name="reddit_netsec",
+        url="https://feeds.example/rss",
+        http=httpx.Client(
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, text=feed))
+        ),
+    )
+
+    items = connector.fetch()
+
+    assert items[0].published_at == datetime(2026, 1, 26, 1, 29, 14, tzinfo=timezone.utc)
 
 
 def test_nvd_client_parses_references_from_list():
