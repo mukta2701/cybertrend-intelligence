@@ -80,7 +80,7 @@ class IngestionService:
         return results
 
     def _source_trust(self, item: TrendItem) -> float:
-        if item.source_name in {"reddit"} and item.community in {"netsec", "blueteamsec"}:
+        if item.source_name in {"reddit_netsec", "reddit_blueteamsec"}:
             return 0.85
         if item.source_name in {"tenable", "nvd", "kev"}:
             return 0.95

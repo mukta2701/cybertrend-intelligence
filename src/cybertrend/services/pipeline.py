@@ -8,7 +8,6 @@ from uuid import uuid4
 from sqlalchemy.orm import scoped_session
 
 from cybertrend.config import Settings
-from cybertrend.connectors.reddit import RedditClient
 from cybertrend.connectors.tenable import TenableVPRClient
 from cybertrend.db.repository import Repository
 from cybertrend.db.session import make_session_factory
@@ -18,8 +17,12 @@ from cybertrend.models import DigestPayload, DigestSection, SourcePolicy, TrendI
 from cybertrend.queue import SQSQueue
 from cybertrend.services.ingestion import IngestionService
 
-DEFAULT_REDDIT_COMMUNITIES = ["netsec", "cybersecurity", "threatintel", "blueteamsec", "Malware"]
 DEFAULT_RSS_FEEDS = {
+    "reddit_netsec": "https://www.reddit.com/r/netsec/.rss",
+    "reddit_cybersecurity": "https://www.reddit.com/r/cybersecurity/.rss",
+    "reddit_threatintel": "https://www.reddit.com/r/threatintel/.rss",
+    "reddit_blueteamsec": "https://www.reddit.com/r/blueteamsec/.rss",
+    "reddit_malware": "https://www.reddit.com/r/Malware/.rss",
     "tenable": "https://www.tenable.com/security/research/feed",
 }
 
@@ -60,17 +63,9 @@ class PipelineService:
             configuration_set=settings.ses_configuration_set,
             region_name=settings.aws_region,
         )
-        reddit_client = None
-        if settings.reddit_client_id and settings.reddit_client_secret:
-            reddit_client = RedditClient(
-                client_id=settings.reddit_client_id,
-                client_secret=settings.reddit_client_secret,
-                user_agent=settings.reddit_user_agent,
-            )
         ingestion = IngestionService(
             repository=repository,
             alert_queue=alert_queue,
-            reddit_client=reddit_client,
             tenable_client=TenableVPRClient(
                 access_key=settings.tenable_access_key,
                 secret_key=settings.tenable_secret_key,
@@ -89,15 +84,6 @@ class PipelineService:
         run_id = f"manual-{uuid4()}"
         jobs: List[Dict[str, Any]] = []
         requested_at = datetime.now(timezone.utc).isoformat()
-        for community in DEFAULT_REDDIT_COMMUNITIES:
-            jobs.append(
-                {
-                    "source_type": "reddit",
-                    "source_name": "reddit",
-                    "community": community,
-                    "requested_at": requested_at,
-                }
-            )
         for name, url in DEFAULT_RSS_FEEDS.items():
             jobs.append(
                 {
