@@ -1,35 +1,97 @@
-# Cybertrend
+# Cybertrend Intelligence
 
-Cybertrend is a production-shaped cybersecurity trend intelligence service. It ingests Reddit,
-security RSS, and vulnerability feeds, enriches CVEs, deduplicates signals, scores urgency and
-confidence, and sends immediate SES alerts plus a daily digest.
+A personal cybersecurity threat intelligence pipeline that automatically collects, scores, and summarises the latest security news and CVEs — then emails you a formatted digest every 3 days.
+
+## What It Does
+
+- Fetches from **7 RSS feeds** (BleepingComputer, The Hacker News, Krebs on Security, SANS ISC, Dark Reading, SecurityWeek, Tenable Research) and the **NVD CVE API**
+- Scores each item by exploitability using CVSS, EPSS, CISA KEV, and exploit evidence
+- Summarises every article with GPT-4o-mini into 8 structured fields (vulnerability, threat, affected assets, recommended action, and more)
+- Sends a formatted HTML digest to your inbox grouped by severity: Critical / High / Medium
+- Sends immediate alerts for Critical items scoring ≥ 90
 
 ## Local Setup
 
-The deployment target is Python 3.12 on AWS Lambda. For local development:
+Requires Python 3.12, Docker, and a Gmail account with an App Password.
 
 ```bash
-cp .env.example .env
+cp .env.example .env          # fill in your credentials
 docker compose up -d postgres
 python3.12 -m venv .venv
-. .venv/bin/activate
-pip install -e ".[dev,infra]"
+source .venv/bin/activate
+pip install -e ".[dev]"
 alembic upgrade head
-pytest
+pytest                        # verify everything works
 ```
 
-This workstation may not have Python 3.12 available; CI is configured to verify against Python
-3.12.
+## Running It
+
+```bash
+# Fetch all sources, score and summarise items
+python run.py collect
+
+# Build and send today's digest to your email
+python run.py digest
+
+# Re-summarise today's items if GPT output looks stale
+python run.py rescan
+
+# Start the local REST API on http://127.0.0.1:8000
+python run.py api
+```
+
+## Automatic Schedule
+
+A cron job runs collect + digest every 3 days at 9am (set up with `crontab -e`):
+
+```
+0 9 */3 * * cd "/path/to/project" && .venv/bin/python run.py collect && .venv/bin/python run.py digest
+```
+
+Logs go to `/tmp/cybertrend.log`.
+
+## Configuration
+
+Copy `.env.example` to `.env` and fill in:
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `API_KEY` | Secret key for the REST API |
+| `SMTP_USER` / `SMTP_PASSWORD` | Gmail address + App Password |
+| `ALERT_RECIPIENTS` | Email(s) for immediate critical alerts |
+| `DIGEST_RECIPIENTS` | Email(s) for the 3-day digest |
+| `LLM_API_KEY` | OpenAI API key for GPT-4o-mini summarisation |
+| `NVD_API_KEY` | Optional — free key from nvd.nist.gov |
 
 ## Architecture
 
-- EventBridge Scheduler triggers collection every 15 minutes.
-- Collector Lambda enqueues source jobs onto SQS.
-- Worker Lambdas collect, normalize, enrich, dedupe, score, summarize, and persist trend items.
-- Alert Lambda sends immediate SES alerts for critical items.
-- Digest Lambda sends the daily Europe/London digest at 07:30.
-- FastAPI runs behind API Gateway for manual runs, item search, source health, source policy, and
-  score explanations.
+```
+RSS Feeds + NVD API
+       ↓
+   Collect & Deduplicate
+       ↓
+   Score (CVSS + EPSS + KEV + exploit signals)
+       ↓
+   Enrich (NVD, EPSS, CISA KEV)
+       ↓
+   Summarise (GPT-4o-mini, 10 parallel workers)
+       ↓
+   Store (PostgreSQL)
+       ↓
+   Email Digest (Gmail SMTP)
+```
 
-See [docs/operations.md](docs/operations.md) for deployment and operations guidance.
+The project also includes an AWS CDK stack (`infra/`) for cloud deployment with Lambda, SQS, RDS, and EventBridge — but the local setup above is fully self-contained.
 
+## Docs
+
+- [How It Works](docs/HOW_IT_WORKS.md) — full explanation of every pipeline stage, design decisions, and security hardening
+- [Operations](docs/operations.md) — runbook and deployment notes
+
+## Security
+
+- API key authentication with timing-safe comparison
+- SMTP with verified TLS (`ssl.create_default_context()`)
+- GPT prompt hardened against injection from article content
+- All credentials loaded from `.env` (never committed)

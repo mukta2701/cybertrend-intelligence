@@ -5,8 +5,6 @@
 Store these values in AWS Secrets Manager after deployment:
 
 - `API_KEY`
-- `REDDIT_CLIENT_ID`
-- `REDDIT_CLIENT_SECRET`
 - `NVD_API_KEY`
 - `TENABLE_ACCESS_KEY`
 - `TENABLE_SECRET_KEY`
