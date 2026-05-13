@@ -10,4 +10,4 @@ psycopg[binary]>=3.2
 python-dateutil>=2.9
 sqlalchemy>=2.0
 structlog>=24.1
-
+openai>=1.30
