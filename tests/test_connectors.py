@@ -163,3 +163,34 @@ def test_rss_connector_uses_path_safe_stable_item_ids():
     assert items[0].item_id.startswith("rss:tenable:")
     assert "/" not in items[0].item_id
     assert " " not in items[0].item_id
+
+
+def test_nvd_client_parses_references_from_list():
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "vulnerabilities": [
+                    {
+                        "cve": {
+                            "id": "CVE-2026-12345",
+                            "metrics": {
+                                "cvssMetricV31": [
+                                    {"cvssData": {"baseScore": 9.8, "baseSeverity": "CRITICAL"}}
+                                ]
+                            },
+                            "references": [
+                                {"url": "https://example.com/advisory"},
+                                {"url": "https://example.com/patch"},
+                            ],
+                        }
+                    }
+                ]
+            },
+        )
+
+    client = NVDClient(http=httpx.Client(transport=httpx.MockTransport(handler)))
+    enrichment = client.fetch("CVE-2026-12345")
+
+    assert "https://example.com/advisory" in enrichment.references
+    assert len(enrichment.references) == 2

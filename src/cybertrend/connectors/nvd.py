@@ -38,10 +38,12 @@ class NVDClient:
                 cvss_severity = cvss.get("baseSeverity") or entries[0].get("baseSeverity")
                 break
         references = []
-        for reference in cve_payload.get("references", {}).get("referenceData", []):
-            url = reference.get("url")
-            if url:
-                references.append(url)
+        refs = cve_payload.get("references") or []
+        if isinstance(refs, list):
+            for reference in refs:
+                url = reference.get("url")
+                if url:
+                    references.append(url)
         return CVEEnrichment(
             cve=cve_payload.get("id", cve),
             cvss_base=cvss_base,
