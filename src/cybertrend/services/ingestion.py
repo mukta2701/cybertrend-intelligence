@@ -36,17 +36,28 @@ class IngestionService:
         self.summarizer = summarizer or HybridSummaryProvider()
 
     def process_job(self, job: dict) -> int:
-        source_type = job.get("source_type")
+        source_type = job.get("source_type", "unknown")
+        source_name = job.get("source_name", "unknown")
         items: List[TrendItem] = []
-        if source_type == "reddit":
-            if not self.reddit_client:
-                raise RuntimeError("Reddit client is not configured")
-            items = self.reddit_client.fetch_subreddit(job["community"])
-        elif source_type == "rss":
-            items = RSSConnector(source_name=job["source_name"], url=job["url"]).fetch()
-        else:
-            raise ValueError(f"Unsupported source_type: {source_type}")
-        return self.process_items(items)
+        try:
+            if source_type == "reddit":
+                if not self.reddit_client:
+                    raise RuntimeError("Reddit client is not configured")
+                items = self.reddit_client.fetch_subreddit(job["community"])
+            elif source_type == "rss":
+                items = RSSConnector(source_name=source_name, url=job["url"]).fetch()
+            else:
+                raise ValueError(f"Unsupported source_type: {source_type}")
+            count = self.process_items(items)
+            if getattr(self.repository, "upsert_source_health", None):
+                self.repository.upsert_source_health(source_name, source_type, success=True)
+            return count
+        except Exception as exc:
+            if getattr(self.repository, "upsert_source_health", None):
+                self.repository.upsert_source_health(
+                    source_name, source_type, success=False, error=str(exc)
+                )
+            raise
 
     def process_items(self, items: Iterable[TrendItem]) -> int:
         stored = 0

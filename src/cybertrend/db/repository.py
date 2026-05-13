@@ -208,6 +208,37 @@ class Repository:
             for record in records
         ]
 
+    def upsert_source_health(
+        self,
+        source_name: str,
+        source_type: str,
+        *,
+        success: bool,
+        error: Optional[str] = None,
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        existing = self.session.get(SourceHealthRecord, source_name)
+        if existing:
+            if success:
+                existing.last_success_at = now
+                existing.consecutive_failures = 0
+                existing.last_error = None
+            else:
+                existing.last_error_at = now
+                existing.last_error = error
+                existing.consecutive_failures = (existing.consecutive_failures or 0) + 1
+        else:
+            record = SourceHealthRecord(
+                source_name=source_name,
+                source_type=source_type,
+                last_success_at=now if success else None,
+                last_error_at=None if success else now,
+                last_error=None if success else error,
+                consecutive_failures=0 if success else 1,
+            )
+            self.session.add(record)
+        self.session.commit()
+
     def update_source_policy(self, policy: SourcePolicy) -> None:
         for entry in policy.sources:
             values = entry.model_dump()
