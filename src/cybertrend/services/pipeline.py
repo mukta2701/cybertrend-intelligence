@@ -26,6 +26,7 @@ DEFAULT_RSS_FEEDS = {
     "darkreading": "https://www.darkreading.com/rss.xml",
     "securityweek": "https://www.securityweek.com/feed/",
     "tenable": "https://www.tenable.com/security/research/feed",
+    "reddit_pwnhub": "https://www.reddit.com/r/pwnhub/.rss",
 }
 
 DEFAULT_NVD_JOBS = [
