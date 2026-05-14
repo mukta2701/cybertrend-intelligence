@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from cybertrend.db.models import (
@@ -95,7 +95,10 @@ class Repository:
         statement = insert(TrendItemRecord).values(**values)
         statement = statement.on_conflict_do_update(
             index_elements=[TrendItemRecord.item_id],
-            set_={key: value for key, value in values.items() if key != "item_id"},
+            set_={
+                **{key: value for key, value in values.items() if key != "item_id"},
+                "updated_at": func.now(),
+            },
         )
         self.session.execute(statement)
         self.session.commit()
@@ -165,8 +168,8 @@ class Repository:
         records = list(
             self.session.scalars(
                 select(TrendItemRecord)
-                .where(TrendItemRecord.created_at >= start)
-                .where(TrendItemRecord.created_at < end)
+                .where(TrendItemRecord.updated_at >= start)
+                .where(TrendItemRecord.updated_at < end)
                 .order_by(TrendItemRecord.criticality_score.desc())
             )
         )
