@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from cybertrend.email.render import render_daily_digest, render_immediate_alert
+from cybertrend.email.render import render_daily_digest, render_immediate_alert, _SOURCE_LABELS, _source_label
 from cybertrend.models import DigestPayload, DigestSection, EngagementMetrics, SourceType, TrendItem
 
 
@@ -69,3 +69,20 @@ def test_render_daily_digest_groups_sections_and_counts_severity_labels():
     assert "netsec: high signal" in message.html
     assert "Actively Exploited" in message.html
     assert "Cisco ASA" in message.html
+
+
+def test_source_label_reddit_pwnhub():
+    i = item()
+    i = i.model_copy(update={"source_name": "reddit_pwnhub", "community": None})
+    assert _source_label(i) == "r/pwnhub"
+
+
+def test_footer_contains_all_source_labels():
+    payload = DigestPayload(
+        digest_date=date(2026, 5, 15),
+        sections=[DigestSection(name="Critical Threats", severity="Critical", items=[item()])],
+    )
+    message = render_daily_digest(payload)
+    for label in _SOURCE_LABELS.values():
+        assert label in message.html, f"Footer missing: {label}"
+    assert "r/pwnhub" in message.html

@@ -15,6 +15,7 @@ _SOURCE_LABELS = {
     "securityweek": "SecurityWeek",
     "tenable": "Tenable Research",
     "nvd": "NVD / NIST",
+    "reddit_pwnhub": "r/pwnhub",
 }
 
 _SEV_COLORS = {
@@ -311,9 +312,8 @@ def render_daily_digest(payload: DigestPayload) -> RenderedEmail:
         '<div style="background:#0f1923;padding:16px 24px;border-radius:0 0 8px 8px;">'
         + quality_html
         + '<p style="margin:0;font-size:11px;color:#4a5568;">'
-        'Cybertrend Intelligence &nbsp;·&nbsp; Automated daily briefing &nbsp;·&nbsp; '
-        'Sources: NVD · Tenable · BleepingComputer · The Hacker News · Krebs · SANS ISC · '
-        'Dark Reading · SecurityWeek'
+        f'Cybertrend Intelligence &nbsp;·&nbsp; Automated daily briefing &nbsp;·&nbsp; '
+        f'Sources: {escape(" · ".join(_SOURCE_LABELS.values()))}'
         '</p></div>'
     )
 
