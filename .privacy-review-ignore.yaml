@@ -11,3 +11,7 @@ ignore:
     reason: "test mock of OpenAI client — no real data sent to LLM"
   - fingerprint: "0958ac552e44e023"
     reason: "test mock of OpenAI client — no real data sent to LLM"
+  - fingerprint: "a61ba259de7b19a5"
+    reason: "_sanitize() redacts PII from article text before prompt construction"
+  - fingerprint: "ab24f7070bababd7"
+    reason: "_sanitize() redacts PII from article text before prompt construction"
