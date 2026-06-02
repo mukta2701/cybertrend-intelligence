@@ -108,7 +108,7 @@ class IngestionService:
                 source_trust=source_trust,
                 corroboration_count=corroboration,
             )
-            if self._can_reuse_summary(existing, item):
+            if self._can_reuse_summary(existing, item) and existing is not None:
                 summarized = self._reuse_summary(scored, existing)
                 stats.skipped_summaries += 1
             else:

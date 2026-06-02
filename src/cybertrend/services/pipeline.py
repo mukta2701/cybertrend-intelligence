@@ -175,7 +175,7 @@ class PipelineService:
         stats = getattr(self.ingestion_service, "last_stats", None)
         if stats is None:
             return {"stored_items": stored_items}
-        if is_dataclass(stats):
+        if is_dataclass(stats) and not isinstance(stats, type):
             payload = asdict(stats)
         elif isinstance(stats, dict):
             payload = dict(stats)

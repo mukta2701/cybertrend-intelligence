@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from html import escape
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from cybertrend.models import DigestPayload, RenderedEmail, TrendItem
 
@@ -47,7 +47,7 @@ def _truncate(text: str, limit: int = 280) -> str:
     return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "…"
 
 
-def _derive_exploitation(item: TrendItem) -> str:
+def _derive_exploitation(item: TrendItem) -> Optional[str]:
     if item.kev_flag:
         return "Actively Exploited — CISA KEV"
     evidence = (item.exploit_evidence or "").lower()

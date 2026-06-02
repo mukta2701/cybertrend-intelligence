@@ -107,7 +107,8 @@ class OpenAISummaryProvider:
             response_format={"type": "json_object"},
             max_tokens=600,
         )
-        data: Dict[str, Any] = json.loads(response.choices[0].message.content)
+        raw = response.choices[0].message.content or ""
+        data: Dict[str, Any] = json.loads(raw)
 
         headline = str(data.get("headline") or "").strip()
         if not headline:
