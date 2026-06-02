@@ -33,6 +33,25 @@ def test_smtp_sender_sends_to_recipients():
         assert args[1] == ["analyst@example.com"]
 
 
+def test_smtp_sender_uses_configured_timeout():
+    with patch("smtplib.SMTP") as mock_smtp_class:
+        mock_smtp = MagicMock()
+        mock_smtp_class.return_value.__enter__ = MagicMock(return_value=mock_smtp)
+        mock_smtp_class.return_value.__exit__ = MagicMock(return_value=False)
+
+        sender = SMTPEmailSender(
+            host="smtp.gmail.com",
+            port=587,
+            user="test@gmail.com",
+            password=SMTP_PASSWORD_PLACEHOLDER,
+            from_email="test@gmail.com",
+            timeout_seconds=12,
+        )
+        sender.send(_message(), ["analyst@example.com"])
+
+        mock_smtp_class.assert_called_once_with("smtp.gmail.com", 587, timeout=12)
+
+
 def test_smtp_sender_skips_send_with_no_recipients():
     with patch("smtplib.SMTP") as mock_smtp_class:
         sender = SMTPEmailSender(

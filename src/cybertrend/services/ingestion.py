@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional
 
 from cybertrend.connectors.epss import EPSSClient
@@ -15,6 +16,15 @@ from cybertrend.services.enrichment import merge_enrichments
 from cybertrend.summaries import HybridSummaryProvider
 
 
+@dataclass
+class IngestionStats:
+    fetched_items: int = 0
+    processed_items: int = 0
+    stored_items: int = 0
+    skipped_summaries: int = 0
+    limited_items: int = 0
+
+
 class IngestionService:
     def __init__(
         self,
@@ -26,6 +36,8 @@ class IngestionService:
         kev_client: Optional[KEVClient] = None,
         tenable_client: Optional[TenableVPRClient] = None,
         summarizer: Optional[HybridSummaryProvider] = None,
+        max_items_per_source: int = 25,
+        max_nvd_items: int = 50,
     ):
         self.repository = repository
         self.alert_queue = alert_queue
@@ -35,6 +47,9 @@ class IngestionService:
         self.kev_client = kev_client or KEVClient()
         self.tenable_client = tenable_client or TenableVPRClient()
         self.summarizer = summarizer or HybridSummaryProvider()
+        self.max_items_per_source = max_items_per_source
+        self.max_nvd_items = max_nvd_items
+        self.last_stats = IngestionStats()
 
     def process_job(self, job: dict) -> int:
         source_type = job.get("source_type", "unknown")
@@ -53,10 +68,15 @@ class IngestionService:
                 items = self.nvd_client.fetch_recent(hours_back=hours_back)
             else:
                 raise ValueError(f"Unsupported source_type: {source_type}")
-            count = self.process_items(items)
+            fetched_items = len(items)
+            limited_items = self._limit_items(items, source_type)
+            stats = self._process_items_with_stats(limited_items)
+            stats.fetched_items = fetched_items
+            stats.limited_items = max(fetched_items - stats.processed_items, 0)
+            self.last_stats = stats
             if getattr(self.repository, "upsert_source_health", None):
                 self.repository.upsert_source_health(source_name, source_type, success=True)
-            return count
+            return stats.stored_items
         except Exception as exc:
             if getattr(self.repository, "upsert_source_health", None):
                 self.repository.upsert_source_health(
@@ -65,8 +85,20 @@ class IngestionService:
             raise
 
     def process_items(self, items: Iterable[TrendItem]) -> int:
-        stored = 0
+        item_list = list(items)
+        stats = self._process_items_with_stats(item_list)
+        stats.fetched_items = len(item_list)
+        self.last_stats = stats
+        return stats.stored_items
+
+    def _process_items_with_stats(self, items: List[TrendItem]) -> IngestionStats:
+        stats = IngestionStats(processed_items=len(items))
         for item in items:
+            existing = (
+                self.repository.get_item(item.item_id)
+                if getattr(self.repository, "get_item", None)
+                else None
+            )
             enrichments = self._enrich_item(item)
             source_trust = self._source_trust(item)
             corroboration = self._corroboration_count(item)
@@ -76,12 +108,52 @@ class IngestionService:
                 source_trust=source_trust,
                 corroboration_count=corroboration,
             )
-            summarized = self.summarizer.summarize(scored, enrichments)
+            if self._can_reuse_summary(existing, item) and existing is not None:
+                summarized = self._reuse_summary(scored, existing)
+                stats.skipped_summaries += 1
+            else:
+                summarized = self.summarizer.summarize(scored, enrichments)
             self.repository.upsert_item(summarized)
             if summarized.severity_label == "Critical" and self.alert_queue:
                 self.alert_queue.enqueue({"item_id": summarized.item_id})
-            stored += 1
-        return stored
+            stats.stored_items += 1
+        return stats
+
+    def _limit_items(self, items: List[TrendItem], source_type: str) -> List[TrendItem]:
+        limit = self.max_nvd_items if source_type == "nvd" else self.max_items_per_source
+        if limit <= 0 or len(items) <= limit:
+            return items
+        return sorted(items, key=self._pre_enrichment_priority, reverse=True)[:limit]
+
+    def _pre_enrichment_priority(self, item: TrendItem):
+        return (
+            1 if item.kev_flag else 0,
+            item.cvss_base or 0,
+            item.epss_percentile or 0,
+            item.engagement_metrics.score,
+            item.engagement_metrics.comments,
+            item.published_at,
+        )
+
+    def _can_reuse_summary(self, existing: Optional[TrendItem], incoming: TrendItem) -> bool:
+        if not existing or not existing.llm_analysis:
+            return False
+        return (
+            existing.title == incoming.title
+            and existing.url == incoming.url
+            and existing.cves == incoming.cves
+            and existing.raw == incoming.raw
+        )
+
+    def _reuse_summary(self, item: TrendItem, existing: TrendItem) -> TrendItem:
+        return item.model_copy(
+            update={
+                "summary": existing.summary,
+                "what_went_wrong": existing.what_went_wrong,
+                "why_this_matters_now": existing.why_this_matters_now,
+                "llm_analysis": existing.llm_analysis,
+            }
+        )
 
     def _enrich_item(self, item: TrendItem) -> Dict[str, CVEEnrichment]:
         results: Dict[str, CVEEnrichment] = {}

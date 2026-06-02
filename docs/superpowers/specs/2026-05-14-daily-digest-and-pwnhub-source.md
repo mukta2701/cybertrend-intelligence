@@ -16,12 +16,13 @@ Two small changes to the running local pipeline:
 0 9 */3 * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py collect >> /tmp/cybertrend.log 2>&1 && .venv/bin/python run.py digest >> /tmp/cybertrend.log 2>&1
 ```
 
-**Target crontab entry:**
+**Current improved target crontab entries:**
 ```
-0 9 * * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py collect >> /tmp/cybertrend.log 2>&1 && .venv/bin/python run.py digest >> /tmp/cybertrend.log 2>&1
+0 8 * * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py collect >> /tmp/cybertrend.log 2>&1
+0 9 * * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py digest >> /tmp/cybertrend.log 2>&1
 ```
 
-Change: `*/3` → `*` in the day-of-month field. Time (09:00) and log path unchanged.
+Change: run daily and split collection from digest delivery so email is not blocked by the same cron command.
 
 ## Change 2: r/pwnhub RSS source
 

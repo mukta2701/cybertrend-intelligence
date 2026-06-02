@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import time
+from dataclasses import asdict, is_dataclass
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -73,6 +75,7 @@ class PipelineService:
                 user=settings.smtp_user,
                 password=settings.smtp_password,
                 from_email=settings.email_from or settings.smtp_user,
+                timeout_seconds=settings.smtp_timeout_seconds,
             )
         llm_provider = None
         if settings.llm_provider == "openai" and settings.llm_api_key:
@@ -88,6 +91,8 @@ class PipelineService:
                 secret_key=settings.tenable_secret_key,
             ),
             summarizer=summarizer,
+            max_items_per_source=settings.max_items_per_source,
+            max_nvd_items=settings.max_nvd_items,
         )
         return cls(
             repository=repository,
@@ -116,14 +121,31 @@ class PipelineService:
         processed_jobs = 0
         stored_items = 0
         failed_jobs: List[Dict[str, Any]] = []
+        source_stats: List[Dict[str, Any]] = []
         if self.queue:
             for job in jobs:
                 self.queue.enqueue(job)
+                source_stats.append(
+                    {
+                        "source_type": job.get("source_type"),
+                        "source_name": job.get("source_name"),
+                        "queued": True,
+                    }
+                )
         elif self.ingestion_service:
             for job in jobs:
+                started = time.perf_counter()
+                stat: Dict[str, Any] = {
+                    "source_type": job.get("source_type"),
+                    "source_name": job.get("source_name"),
+                    "success": False,
+                }
                 try:
-                    stored_items += self.ingestion_service.process_job(job)
+                    stored = self.ingestion_service.process_job(job)
+                    stored_items += stored
                     processed_jobs += 1
+                    stat.update(self._ingestion_stats_payload(stored))
+                    stat["success"] = True
                 except Exception as exc:
                     failed_jobs.append(
                         {
@@ -133,13 +155,34 @@ class PipelineService:
                             "error": str(exc),
                         }
                     )
-        return {
+                    stat["error"] = str(exc)
+                finally:
+                    stat["elapsed_seconds"] = round(time.perf_counter() - started, 3)
+                    source_stats.append(stat)
+        result = {
             "run_id": run_id,
             "queued_jobs": len(jobs),
             "processed_jobs": processed_jobs,
             "stored_items": stored_items,
             "failed_jobs": failed_jobs,
+            "source_stats": source_stats,
         }
+        if not self.queue and self.ingestion_service:
+            result["alerts_sent"] = self._send_pending_critical_alerts()
+        return result
+
+    def _ingestion_stats_payload(self, stored_items: int) -> Dict[str, Any]:
+        stats = getattr(self.ingestion_service, "last_stats", None)
+        if stats is None:
+            return {"stored_items": stored_items}
+        if is_dataclass(stats) and not isinstance(stats, type):
+            payload = asdict(stats)
+        elif isinstance(stats, dict):
+            payload = dict(stats)
+        else:
+            payload = dict(getattr(stats, "__dict__", {}))
+        payload.setdefault("stored_items", stored_items)
+        return payload
 
     def process_source_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
         if self.ingestion_service:
@@ -202,15 +245,39 @@ class PipelineService:
         if self.repository.alert_already_sent(item_id, "immediate"):
             return False
         recipients = self.settings.alert_recipients if self.settings else []
+        if not recipients:
+            return False
         self.email_sender.send(render_immediate_alert(item), recipients)
         self.repository.record_alert_delivery(item_id, "immediate")
         return True
 
     def send_daily_digest(self, digest_date: date) -> Dict[str, Any]:
         payload = self.get_digest(digest_date)
+        if self.repository:
+            self.repository.save_digest(payload)          # persist first, sent_at=None
+        sent = False
         if self.email_sender and self.settings and self.settings.digest_recipients:
-            self.email_sender.send(render_daily_digest(payload), self.settings.digest_recipients)
-        return {"digest_date": digest_date.isoformat(), "sent": bool(self.email_sender)}
+            try:
+                self.email_sender.send(
+                    render_daily_digest(payload), self.settings.digest_recipients
+                )
+                sent = True
+                if self.repository:
+                    self.repository.save_digest(payload, sent_at=datetime.now(timezone.utc))
+            except Exception:
+                pass
+        return {"digest_date": digest_date.isoformat(), "sent": sent}
+
+    def _send_pending_critical_alerts(self) -> int:
+        if not self.repository or not self.email_sender:
+            return 0
+        today = datetime.now(timezone.utc).date()
+        items = self.repository.get_items_by_ingestion_date(today)
+        sent = 0
+        for item in items:
+            if item.severity_label == "Critical" and self.send_immediate_alert(item.item_id):
+                sent += 1
+        return sent
 
     def refresh_source_quality(self) -> Dict[str, Any]:
         if not self.repository:

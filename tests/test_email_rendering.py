@@ -1,18 +1,20 @@
 from datetime import date, datetime, timezone
 
 from cybertrend.email.render import (
-    render_daily_digest,
-    render_immediate_alert,
     _SOURCE_LABELS,
-    _source_label,
+    _action_chips_html,
     _derive_action_type,
     _derive_timeframe,
-    _top_summary_bullets,
     _item_compact_html,
     _item_compact_text,
+    _item_html,
     _item_minimal_html,
     _item_minimal_text,
-    _item_html,
+    _item_text,
+    _source_label,
+    _top_summary_bullets,
+    render_daily_digest,
+    render_immediate_alert,
 )
 from cybertrend.models import DigestPayload, DigestSection, EngagementMetrics, SourceType, TrendItem
 
@@ -124,7 +126,7 @@ def test_derive_action_type_investigate():
 
 
 def test_derive_action_type_fallback():
-    assert _derive_action_type("Consult your vendor for further guidance.") == "Review"
+    assert _derive_action_type("Consult your vendor for further guidance.") == "Review exposure"
 
 
 def test_derive_timeframe_kev_flag():
@@ -389,3 +391,60 @@ def test_render_daily_digest_empty_section_produces_no_html():
     assert "No items today" not in message.html
     assert "High Priority" not in message.html
     assert "Medium Risk" not in message.html
+
+
+# ── Task 8: action chips ──────────────────────────────────────────────────────
+
+def test_action_chips_rendered_when_llm_action_fields_present():
+    i = item().model_copy(update={"llm_analysis": {
+        **item().llm_analysis,
+        "action_type": "Patch",
+        "action_owner": "Network team",
+        "timeframe": "Now",
+    }})
+
+    html = _item_html(i, "Critical")
+
+    assert "Patch" in html
+    assert "Network team" in html
+    assert "Now" in html
+
+
+def test_action_chips_absent_when_llm_action_fields_missing():
+    base = item()
+    i = base.model_copy(update={"llm_analysis": {
+        k: v for k, v in base.llm_analysis.items()
+        if k not in ("action_type", "action_owner", "timeframe")
+    }})
+
+    chips = _action_chips_html(i, "Critical")
+
+    assert chips == ""
+
+
+def test_action_chips_now_timeframe_uses_critical_red():
+    i = item().model_copy(update={"llm_analysis": {
+        **item().llm_analysis,
+        "action_type": "Patch",
+        "action_owner": "SOC",
+        "timeframe": "Now",
+    }})
+
+    chips = _action_chips_html(i, "Critical")
+
+    assert "#c0392b" in chips
+
+
+def test_action_chips_text_line_included_in_plain_text_output():
+    i = item().model_copy(update={"llm_analysis": {
+        **item().llm_analysis,
+        "action_type": "Patch",
+        "action_owner": "Network team",
+        "timeframe": "Today",
+    }})
+
+    text = _item_text(i)
+
+    assert "Patch" in text
+    assert "Network team" in text
+    assert "Today" in text

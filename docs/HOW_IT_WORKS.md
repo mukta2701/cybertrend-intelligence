@@ -165,16 +165,17 @@ cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation"
 
 ## Automatic Schedule
 
-A cron job runs collect + digest every 3 days at 9am:
+Two cron jobs run collection and email delivery separately. Collection starts earlier, and the digest sends from already-stored data:
 
 ```
-0 9 */3 * * cd "..." && .venv/bin/python run.py collect && .venv/bin/python run.py digest
+0 8 * * * cd "..." && .venv/bin/python run.py collect >> /tmp/cybertrend.log 2>&1
+0 9 * * * cd "..." && .venv/bin/python run.py digest >> /tmp/cybertrend.log 2>&1
 ```
 
 To view or edit it: `crontab -e`
 To check the log: `cat /tmp/cybertrend.log`
 
-**Note:** Your Mac must be on and awake at 9am for the cron to fire.
+**Note:** Your Mac must be on and awake for both cron jobs to fire.
 
 ---
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -119,12 +120,10 @@ class Repository:
         if since:
             statement = statement.where(TrendItemRecord.published_at >= since)
         if cursor:
-            try:
+            with suppress(ValueError):
                 statement = statement.where(
                     TrendItemRecord.published_at < datetime.fromisoformat(cursor)
                 )
-            except ValueError:
-                pass  # invalid cursor ignored — return from beginning
         statement = statement.order_by(TrendItemRecord.published_at.desc()).limit(limit + 1)
         records = list(self.session.scalars(statement))
         next_cursor = None
@@ -145,6 +144,20 @@ class Repository:
         if not record:
             return None
         return DigestPayload.model_validate(record.payload)
+
+    def save_digest(self, payload: DigestPayload, *, sent_at: Optional[datetime] = None) -> None:
+        values = {
+            "digest_date": payload.digest_date,
+            "payload": payload.model_dump(mode="json"),
+            "sent_at": sent_at,
+        }
+        stmt = insert(DigestRunRecord).values(**values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[DigestRunRecord.digest_date],
+            set_={k: v for k, v in values.items() if k != "digest_date" and v is not None},
+        )
+        self.session.execute(stmt)
+        self.session.commit()
 
     def get_items_by_ingestion_date(self, ingestion_date: date) -> List[TrendItem]:
         start = datetime(

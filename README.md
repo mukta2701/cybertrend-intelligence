@@ -1,6 +1,6 @@
 # Cybertrend Intelligence
 
-A personal cybersecurity threat intelligence pipeline that automatically collects, scores, and summarises the latest security news and CVEs — then emails you a formatted digest every 3 days.
+A personal cybersecurity threat intelligence pipeline that automatically collects, scores, and summarises the latest security news and CVEs — then emails you a formatted daily digest.
 
 ## What It Does
 
@@ -42,10 +42,11 @@ python run.py api
 
 ## Automatic Schedule
 
-A cron job runs collect + digest every 3 days at 9am (set up with `crontab -e`):
+Two cron jobs keep collection separate from email delivery so the digest does not wait for a slow collection run (set up with `crontab -e`):
 
 ```
-0 9 */3 * * cd "/path/to/project" && .venv/bin/python run.py collect && .venv/bin/python run.py digest
+0 8 * * * cd "/path/to/project" && .venv/bin/python run.py collect >> /tmp/cybertrend.log 2>&1
+0 9 * * * cd "/path/to/project" && .venv/bin/python run.py digest >> /tmp/cybertrend.log 2>&1
 ```
 
 Logs go to `/tmp/cybertrend.log`.
@@ -59,8 +60,10 @@ Copy `.env.example` to `.env` and fill in:
 | `DATABASE_URL` | PostgreSQL connection string |
 | `API_KEY` | Secret key for the REST API |
 | `SMTP_USER` / `SMTP_PASSWORD` | Gmail address + App Password |
+| `SMTP_TIMEOUT_SECONDS` | SMTP network timeout, default `30` |
 | `ALERT_RECIPIENTS` | Email(s) for immediate critical alerts |
-| `DIGEST_RECIPIENTS` | Email(s) for the 3-day digest |
+| `DIGEST_RECIPIENTS` | Email(s) for the daily digest |
+| `MAX_ITEMS_PER_SOURCE` / `MAX_NVD_ITEMS` | Caps expensive enrichment and OpenAI work per collection run |
 | `LLM_API_KEY` | OpenAI API key for GPT-4o-mini summarisation |
 | `NVD_API_KEY` | Optional — free key from nvd.nist.gov |
 

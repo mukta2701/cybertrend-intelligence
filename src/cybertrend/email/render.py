@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from html import escape
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from cybertrend.models import DigestPayload, RenderedEmail, TrendItem
 
@@ -47,7 +47,7 @@ def _truncate(text: str, limit: int = 280) -> str:
     return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "…"
 
 
-def _derive_exploitation(item: TrendItem) -> str:
+def _derive_exploitation(item: TrendItem) -> Optional[str]:
     if item.kev_flag:
         return "Actively Exploited — CISA KEV"
     evidence = (item.exploit_evidence or "").lower()
@@ -99,6 +99,40 @@ def _action_badge(text: str, bg: str) -> str:
     )
 
 
+def _action_chips_html(item: TrendItem, severity: str = "") -> str:
+    if not item.llm_analysis:
+        return ""
+    action_type  = item.llm_analysis.get("action_type")
+    action_owner = item.llm_analysis.get("action_owner")
+    timeframe    = item.llm_analysis.get("timeframe")
+    if not any([action_type, action_owner, timeframe]):
+        return ""
+    sev = severity or item.severity_label
+    type_bg = _SEV_COLORS.get(sev, _SEV_COLORS["Medium"])["bg"]
+    _TF_COLORS = {"Now": "#c0392b", "Today": "#c05621", "This week": "#975a16"}
+    tf_bg = _TF_COLORS.get(timeframe or "", "#718096")
+    chips = ""
+    if action_type:
+        chips += _action_badge(action_type, type_bg)
+    if action_owner:
+        chips += _action_badge(action_owner, "#4a5568")
+    if timeframe:
+        chips += _action_badge(timeframe, tf_bg)
+    return f'<div style="margin:4px 0 8px;">{chips}</div>'
+
+
+def _action_chips_text(item: TrendItem) -> str:
+    if not item.llm_analysis:
+        return ""
+    parts = [
+        item.llm_analysis.get("action_type"),
+        item.llm_analysis.get("action_owner"),
+        item.llm_analysis.get("timeframe"),
+    ]
+    filled = [p for p in parts if p]
+    return " | ".join(filled)
+
+
 def _derive_action_type(action_text: str) -> str:
     text = action_text.lower()
     if any(w in text for w in ("patch", "update", "upgrade")):
@@ -109,7 +143,7 @@ def _derive_action_type(action_text: str) -> str:
         return "Investigate"
     if any(w in text for w in ("block", "restrict", "disable")):
         return "Block"
-    return "Review"
+    return "Review exposure"
 
 
 def _derive_timeframe(item: TrendItem) -> str:
@@ -200,6 +234,8 @@ def _item_html(item: TrendItem, severity: str = "", show_vulnerability: bool = T
             f'CVEs: {escape(cves)}</p>'
         )
 
+    chips = _action_chips_html(item, severity)
+
     return (
         f'<div style="background:#ffffff;border-radius:8px;margin:0 0 16px;'
         f'box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;'
@@ -207,6 +243,7 @@ def _item_html(item: TrendItem, severity: str = "", show_vulnerability: bool = T
         f'<div style="height:3px;background:{sev_color["border"]};"></div>'
         f'<div style="padding:16px 18px;">'
         f'<div style="margin-bottom:8px;">{_exploit_badge(exploitation)}</div>'
+        f'{chips}'
         f'<h3 style="margin:0 0 6px;font-size:14px;line-height:1.4;font-weight:700;">'
         f'<a href="{escape(item.url)}" style="color:#1a202c;text-decoration:none;">'
         f'{escape(headline)}</a></h3>'
@@ -224,11 +261,14 @@ def _item_html(item: TrendItem, severity: str = "", show_vulnerability: bool = T
 
 def _item_text(item: TrendItem) -> str:
     exploitation = _derive_exploitation(item) or _llm(item, "exploitation_status", "Unknown")
+    chips_text = _action_chips_text(item)
     lines = [
         _llm(item, "headline") or item.title,
         f"Source: {_source_label(item)} | Score: {_score(item.criticality_score)}/100",
         f"Exploitation: {exploitation}",
     ]
+    if chips_text:
+        lines.append(f"Action scope: {chips_text}")
     for label, key, fallback in [
         ("Affected",     "affected_assets",    ""),
         ("Vulnerability","vulnerability",       item.summary),
@@ -395,23 +435,31 @@ def render_daily_digest(payload: DigestPayload) -> RenderedEmail:
         rows_html = ""
         rows_text = []
         for idx, i in enumerate(top_items, 1):
-            action_type = _derive_action_type(_llm(i, "recommended_action", ""))
-            timeframe   = _derive_timeframe(i)
+            action_type = (
+                _llm(i, "action_type")
+                or _derive_action_type(_llm(i, "recommended_action", ""))
+            )
+            action_owner = _llm(i, "action_owner")
+            timeframe    = _llm(i, "timeframe") or _derive_timeframe(i)
             assets      = _llm(i, "affected_assets") or i.title
-            tf_color    = "#c0392b" if timeframe == "Today" else (
-                "#975a16" if timeframe == "This week" else "#4a5568"
+            tf_color    = "#c0392b" if timeframe in ("Now", "Today") else (
+                "#975a16" if timeframe == "This week" else "#718096"
             )
             rows_html += (
                 f'<tr>'
                 f'<td style="padding:3px 8px 3px 0;font-size:12px;color:#718096;">{idx}.</td>'
                 f'<td style="padding:3px 0;">'
                 f'{_action_badge(action_type, "#553c9a")}'
-                f'{_action_badge(timeframe, tf_color)}'
+                + (f'{_action_badge(action_owner, "#4a5568")}' if action_owner else "")
+                + f'{_action_badge(timeframe, tf_color)}'
                 f'<span style="font-size:12px;color:#2d3748;">'
                 f'{escape(_truncate(assets, 80))}</span>'
                 f'</td></tr>'
             )
-            rows_text.append(f"{idx}. [{action_type}] [{timeframe}] {_truncate(assets, 80)}")
+            owner_str = f"[{action_owner}] " if action_owner else ""
+            rows_text.append(
+                f"{idx}. [{action_type}] {owner_str}[{timeframe}] {_truncate(assets, 80)}"
+            )
 
         top_actions_html = (
             '<div style="margin:0;padding:12px 16px;background:#f7fafc;'
