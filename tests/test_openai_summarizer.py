@@ -71,3 +71,58 @@ def test_openai_summarizer_falls_back_when_response_is_empty():
 
     assert result.llm_analysis is None
     assert result.item_id == item.item_id
+
+
+def test_openai_summarizer_includes_action_fields_in_llm_analysis():
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = """{
+        "headline": "Cisco ASA — Auth bypass enables unauthenticated remote access",
+        "affected_assets": "Cisco ASA and FTD appliances",
+        "vulnerability": "CVE-2026-12345 is an auth bypass.",
+        "threat": "Unauthenticated remote access.",
+        "exploitation_status": "Actively exploited",
+        "organizational_risk": "Edge firewall compromise.",
+        "recommended_action": "Patch to 9.18.4 immediately.",
+        "why_it_matters": "Active ransomware campaigns.",
+        "action_type": "Patch",
+        "action_owner": "Network team",
+        "timeframe": "Now"
+    }"""
+
+    with patch("cybertrend.summaries_openai.OpenAI") as mock_openai_class:
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        mock_client.chat.completions.create.return_value = mock_response
+
+        provider = OpenAISummaryProvider(api_key=OPENAI_KEY_PLACEHOLDER)
+        result = provider.summarize(_item(), enrichments={})
+
+    assert result.llm_analysis["action_type"] == "Patch"
+    assert result.llm_analysis["action_owner"] == "Network team"
+    assert result.llm_analysis["timeframe"] == "Now"
+
+
+def test_openai_summarizer_uses_safe_fallbacks_for_missing_action_fields():
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = """{
+        "headline": "Cisco ASA — Auth bypass enables unauthenticated remote access",
+        "affected_assets": "Cisco ASA and FTD appliances",
+        "vulnerability": "CVE-2026-12345 is an auth bypass.",
+        "threat": "Unauthenticated remote access.",
+        "exploitation_status": "Actively exploited",
+        "organizational_risk": "Edge firewall compromise.",
+        "recommended_action": "Patch to 9.18.4 immediately.",
+        "why_it_matters": "Active ransomware campaigns."
+    }"""
+
+    with patch("cybertrend.summaries_openai.OpenAI") as mock_openai_class:
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        mock_client.chat.completions.create.return_value = mock_response
+
+        provider = OpenAISummaryProvider(api_key=OPENAI_KEY_PLACEHOLDER)
+        result = provider.summarize(_item(), enrichments={})
+
+    assert result.llm_analysis["action_type"] == "Investigate"
+    assert result.llm_analysis["action_owner"] == "SOC"
+    assert result.llm_analysis["timeframe"] == "This week"
