@@ -146,11 +146,11 @@ class Repository:
             return None
         return DigestPayload.model_validate(record.payload)
 
-    def save_digest(self, payload: DigestPayload) -> None:
+    def save_digest(self, payload: DigestPayload, *, sent_at: Optional[datetime] = None) -> None:
         values = {
             "digest_date": payload.digest_date,
             "payload": payload.model_dump(mode="json"),
-            "sent_at": datetime.now(timezone.utc),
+            "sent_at": sent_at,
         }
         stmt = insert(DigestRunRecord).values(**values)
         stmt = stmt.on_conflict_do_update(

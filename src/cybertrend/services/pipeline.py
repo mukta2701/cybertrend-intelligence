@@ -167,7 +167,7 @@ class PipelineService:
             "failed_jobs": failed_jobs,
             "source_stats": source_stats,
         }
-        if not self.queue:
+        if not self.queue and self.ingestion_service:
             result["alerts_sent"] = self._send_pending_critical_alerts()
         return result
 
@@ -252,11 +252,13 @@ class PipelineService:
     def send_daily_digest(self, digest_date: date) -> Dict[str, Any]:
         payload = self.get_digest(digest_date)
         if self.repository:
-            self.repository.save_digest(payload)
+            self.repository.save_digest(payload)          # persist first, sent_at=None
         sent = False
         if self.email_sender and self.settings and self.settings.digest_recipients:
             self.email_sender.send(render_daily_digest(payload), self.settings.digest_recipients)
             sent = True
+            if self.repository:
+                self.repository.save_digest(payload, sent_at=datetime.now(timezone.utc))
         return {"digest_date": digest_date.isoformat(), "sent": sent}
 
     def _send_pending_critical_alerts(self) -> int:

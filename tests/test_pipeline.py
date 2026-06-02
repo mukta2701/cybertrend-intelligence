@@ -30,7 +30,7 @@ class FakeRepository:
             ],
         )
 
-    def save_digest(self, payload):
+    def save_digest(self, payload, *, sent_at=None):
         self.saved_digests.append(payload)
 
     def get_items_by_ingestion_date(self, target_date):
@@ -152,15 +152,17 @@ def test_send_daily_digest_returns_sent_true_when_email_is_delivered():
         database_url="postgresql+psycopg://x:x@localhost/x",
         digest_recipients="analyst@example.com",
     )
+    sender = FakeEmailSender()
     pipeline = PipelineService(
         repository=FakeRepository(),
-        email_sender=FakeEmailSender(),
+        email_sender=sender,
         settings=settings,
     )
 
     result = pipeline.send_daily_digest(date(2026, 6, 2))
 
     assert result["sent"] is True
+    assert len(sender.sent) == 1
 
 
 def test_send_daily_digest_returns_sent_false_when_no_recipients_configured():
