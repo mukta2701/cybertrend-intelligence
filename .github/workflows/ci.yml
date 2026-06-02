@@ -43,4 +43,6 @@ jobs:
       - name: Test
         run: .venv/bin/pytest --cov=cybertrend --cov-report=term-missing
       - name: CDK synth
-        run: npx aws-cdk synth
+        run: |
+          source .venv/bin/activate
+          npx aws-cdk synth
