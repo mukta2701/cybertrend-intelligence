@@ -245,6 +245,8 @@ class PipelineService:
         if self.repository.alert_already_sent(item_id, "immediate"):
             return False
         recipients = self.settings.alert_recipients if self.settings else []
+        if not recipients:
+            return False
         self.email_sender.send(render_immediate_alert(item), recipients)
         self.repository.record_alert_delivery(item_id, "immediate")
         return True

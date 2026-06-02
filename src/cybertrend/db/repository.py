@@ -155,7 +155,7 @@ class Repository:
         stmt = insert(DigestRunRecord).values(**values)
         stmt = stmt.on_conflict_do_update(
             index_elements=[DigestRunRecord.digest_date],
-            set_={k: v for k, v in values.items() if k != "digest_date"},
+            set_={k: v for k, v in values.items() if k != "digest_date" and v is not None},
         )
         self.session.execute(stmt)
         self.session.commit()
