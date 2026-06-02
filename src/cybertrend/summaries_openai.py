@@ -93,8 +93,18 @@ Quality checks:
 
 
 class OpenAISummaryProvider:
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
-        self.client = OpenAI(api_key=api_key)
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-4o-mini",
+        timeout_seconds: float = 10.0,
+        max_retries: int = 0,
+    ):
+        self.client = OpenAI(
+            api_key=api_key,
+            timeout=timeout_seconds,
+            max_retries=max_retries,
+        )
         self.model = model
 
     def summarize(self, item: TrendItem, enrichments: Mapping[str, CVEEnrichment]) -> TrendItem:

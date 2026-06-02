@@ -23,6 +23,17 @@ def _item():
     )
 
 
+def test_openai_summarizer_configures_bounded_client_timeout():
+    with patch("cybertrend.summaries_openai.OpenAI") as mock_openai_class:
+        OpenAISummaryProvider(api_key=OPENAI_KEY_PLACEHOLDER)
+
+    mock_openai_class.assert_called_once_with(
+        api_key=OPENAI_KEY_PLACEHOLDER,
+        timeout=10.0,
+        max_retries=0,
+    )
+
+
 def test_openai_summarizer_populates_llm_analysis():
     mock_response = MagicMock()
     mock_response.choices[0].message.content = """{
