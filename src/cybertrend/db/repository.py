@@ -146,6 +146,20 @@ class Repository:
             return None
         return DigestPayload.model_validate(record.payload)
 
+    def save_digest(self, payload: DigestPayload) -> None:
+        values = {
+            "digest_date": payload.digest_date,
+            "payload": payload.model_dump(mode="json"),
+            "sent_at": datetime.now(timezone.utc),
+        }
+        stmt = insert(DigestRunRecord).values(**values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[DigestRunRecord.digest_date],
+            set_={k: v for k, v in values.items() if k != "digest_date"},
+        )
+        self.session.execute(stmt)
+        self.session.commit()
+
     def get_items_by_ingestion_date(self, ingestion_date: date) -> List[TrendItem]:
         start = datetime(
             ingestion_date.year, ingestion_date.month, ingestion_date.day, tzinfo=timezone.utc
