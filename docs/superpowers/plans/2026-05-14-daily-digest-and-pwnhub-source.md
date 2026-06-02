@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Run the collect+digest pipeline every day (not every 3rd day) and add r/pwnhub as a public RSS source.
+**Goal:** Run collection and digest delivery every day as separate cron jobs and add r/pwnhub as a public RSS source.
 
 **Architecture:** Two independent changes — one line in `pipeline.py` to add a new feed, one crontab update to change the schedule. The existing `RSSConnector` handles Reddit RSS without any code changes. The pipeline test asserts exact job counts and must be updated to match.
 
@@ -17,7 +17,7 @@
 - `tests/test_pipeline.py` — update expected job count from 8 to 9
 
 **System (not in git):**
-- macOS crontab — change `*/3` to `*` in day-of-month field
+- macOS crontab — split collection and digest delivery into separate daily jobs
 
 ---
 
@@ -103,10 +103,10 @@ git commit -m "feat: add r/pwnhub as public RSS source"
 
 - [ ] **Step 1: Install the updated crontab**
 
-Run this single command — it replaces the schedule in place:
+Run this single command — it replaces the chained schedule with separate jobs:
 
 ```bash
-(crontab -l | sed 's|0 9 \*/3 \* \*|0 9 * * *|') | crontab -
+(crontab -l | grep -v 'run.py collect.*run.py digest'; printf '%s\n' '0 8 * * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py collect >> /tmp/cybertrend.log 2>&1' '0 9 * * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py digest >> /tmp/cybertrend.log 2>&1') | crontab -
 ```
 
 - [ ] **Step 2: Verify the new crontab**
@@ -117,7 +117,8 @@ crontab -l
 
 Expected output contains:
 ```
-0 9 * * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py collect >> /tmp/cybertrend.log 2>&1 && .venv/bin/python run.py digest >> /tmp/cybertrend.log 2>&1
+0 8 * * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py collect >> /tmp/cybertrend.log 2>&1
+0 9 * * * cd "/Users/m1ghty/Documents/Cybersecurity Trend Intelligence Automation" && .venv/bin/python run.py digest >> /tmp/cybertrend.log 2>&1
 ```
 
-The `*/3` should be gone, replaced by a plain `*`.
+The digest job should no longer be chained after `collect`.

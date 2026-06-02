@@ -29,7 +29,10 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    smtp_timeout_seconds: int = 30
     email_from: str = ""
+    max_items_per_source: int = 25
+    max_nvd_items: int = 50
 
     ses_from_email: str = "security-alerts@example.com"
     ses_configuration_set: Optional[str] = None
@@ -54,10 +57,13 @@ SECRET_ENV_KEYS = {
     "TENABLE_ACCESS_KEY",
     "TENABLE_SECRET_KEY",
     "LLM_API_KEY",
+    "SMTP_TIMEOUT_SECONDS",
     "SES_FROM_EMAIL",
     "SES_CONFIGURATION_SET",
     "ALERT_RECIPIENTS",
     "DIGEST_RECIPIENTS",
+    "MAX_ITEMS_PER_SOURCE",
+    "MAX_NVD_ITEMS",
 }
 
 
