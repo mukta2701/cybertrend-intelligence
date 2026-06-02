@@ -109,7 +109,8 @@ def _action_chips_html(item: TrendItem, severity: str = "") -> str:
         return ""
     sev = severity or item.severity_label
     type_bg = _SEV_COLORS.get(sev, _SEV_COLORS["Medium"])["bg"]
-    tf_bg = {"Now": "#c0392b", "Today": "#c05621", "This week": "#975a16"}.get(timeframe or "", "#718096")
+    _TF_COLORS = {"Now": "#c0392b", "Today": "#c05621", "This week": "#975a16"}
+    tf_bg = _TF_COLORS.get(timeframe or "", "#718096")
     chips = ""
     if action_type:
         chips += _action_badge(action_type, type_bg)
@@ -434,7 +435,10 @@ def render_daily_digest(payload: DigestPayload) -> RenderedEmail:
         rows_html = ""
         rows_text = []
         for idx, i in enumerate(top_items, 1):
-            action_type  = _llm(i, "action_type") or _derive_action_type(_llm(i, "recommended_action", ""))
+            action_type = (
+                _llm(i, "action_type")
+                or _derive_action_type(_llm(i, "recommended_action", ""))
+            )
             action_owner = _llm(i, "action_owner")
             timeframe    = _llm(i, "timeframe") or _derive_timeframe(i)
             assets      = _llm(i, "affected_assets") or i.title
@@ -453,7 +457,9 @@ def render_daily_digest(payload: DigestPayload) -> RenderedEmail:
                 f'</td></tr>'
             )
             owner_str = f"[{action_owner}] " if action_owner else ""
-            rows_text.append(f"{idx}. [{action_type}] {owner_str}[{timeframe}] {_truncate(assets, 80)}")
+            rows_text.append(
+                f"{idx}. [{action_type}] {owner_str}[{timeframe}] {_truncate(assets, 80)}"
+            )
 
         top_actions_html = (
             '<div style="margin:0;padding:12px 16px;background:#f7fafc;'

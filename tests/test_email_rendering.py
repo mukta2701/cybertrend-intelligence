@@ -1,20 +1,20 @@
 from datetime import date, datetime, timezone
 
 from cybertrend.email.render import (
-    render_daily_digest,
-    render_immediate_alert,
     _SOURCE_LABELS,
-    _source_label,
+    _action_chips_html,
     _derive_action_type,
     _derive_timeframe,
-    _top_summary_bullets,
-    _action_chips_html,
     _item_compact_html,
     _item_compact_text,
+    _item_html,
     _item_minimal_html,
     _item_minimal_text,
-    _item_html,
     _item_text,
+    _source_label,
+    _top_summary_bullets,
+    render_daily_digest,
+    render_immediate_alert,
 )
 from cybertrend.models import DigestPayload, DigestSection, EngagementMetrics, SourceType, TrendItem
 

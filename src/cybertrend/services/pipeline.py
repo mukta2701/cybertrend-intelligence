@@ -258,7 +258,9 @@ class PipelineService:
         sent = False
         if self.email_sender and self.settings and self.settings.digest_recipients:
             try:
-                self.email_sender.send(render_daily_digest(payload), self.settings.digest_recipients)
+                self.email_sender.send(
+                    render_daily_digest(payload), self.settings.digest_recipients
+                )
                 sent = True
                 if self.repository:
                     self.repository.save_digest(payload, sent_at=datetime.now(timezone.utc))
@@ -273,9 +275,8 @@ class PipelineService:
         items = self.repository.get_items_by_ingestion_date(today)
         sent = 0
         for item in items:
-            if item.severity_label == "Critical":
-                if self.send_immediate_alert(item.item_id):
-                    sent += 1
+            if item.severity_label == "Critical" and self.send_immediate_alert(item.item_id):
+                sent += 1
         return sent
 
     def refresh_source_quality(self) -> Dict[str, Any]:
