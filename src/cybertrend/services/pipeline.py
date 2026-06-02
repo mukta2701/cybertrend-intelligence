@@ -257,10 +257,13 @@ class PipelineService:
             self.repository.save_digest(payload)          # persist first, sent_at=None
         sent = False
         if self.email_sender and self.settings and self.settings.digest_recipients:
-            self.email_sender.send(render_daily_digest(payload), self.settings.digest_recipients)
-            sent = True
-            if self.repository:
-                self.repository.save_digest(payload, sent_at=datetime.now(timezone.utc))
+            try:
+                self.email_sender.send(render_daily_digest(payload), self.settings.digest_recipients)
+                sent = True
+                if self.repository:
+                    self.repository.save_digest(payload, sent_at=datetime.now(timezone.utc))
+            except Exception:
+                pass
         return {"digest_date": digest_date.isoformat(), "sent": sent}
 
     def _send_pending_critical_alerts(self) -> int:

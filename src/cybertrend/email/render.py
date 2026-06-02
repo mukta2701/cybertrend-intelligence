@@ -142,7 +142,7 @@ def _derive_action_type(action_text: str) -> str:
         return "Investigate"
     if any(w in text for w in ("block", "restrict", "disable")):
         return "Block"
-    return "Review"
+    return "Review exposure"
 
 
 def _derive_timeframe(item: TrendItem) -> str:
@@ -439,7 +439,7 @@ def render_daily_digest(payload: DigestPayload) -> RenderedEmail:
             timeframe    = _llm(i, "timeframe") or _derive_timeframe(i)
             assets      = _llm(i, "affected_assets") or i.title
             tf_color    = "#c0392b" if timeframe in ("Now", "Today") else (
-                "#975a16" if timeframe == "This week" else "#4a5568"
+                "#975a16" if timeframe == "This week" else "#718096"
             )
             rows_html += (
                 f'<tr>'

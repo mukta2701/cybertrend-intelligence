@@ -126,7 +126,7 @@ def test_derive_action_type_investigate():
 
 
 def test_derive_action_type_fallback():
-    assert _derive_action_type("Consult your vendor for further guidance.") == "Review"
+    assert _derive_action_type("Consult your vendor for further guidance.") == "Review exposure"
 
 
 def test_derive_timeframe_kev_flag():
